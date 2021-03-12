@@ -1,6 +1,6 @@
 # passivbot_futures
 
-**Version: 2.2.0**
+**Version: 2.2.1**
 
 trading bot running on bybit inverse futures and binance usdt futures
 
@@ -63,6 +63,14 @@ change log
 - now possible to make plots of best candidate by adding param `--plot` when running backtest
 - added multiple scoring functions
 - jitted ema calc
+
+2021-03-12 v2.2.1
+- separated ema span and ema spread into long and short
+    - ema_long_span
+    - ema_long_spread
+    - ema_shrt_span
+    - ema_shrt_spread
+- ema spreads may be negative
 
 
 see `changelog.txt` for earlier changes
