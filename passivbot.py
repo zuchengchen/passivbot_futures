@@ -48,6 +48,16 @@ def calc_ema(alpha: float, alpha_: float, prev_ema: float, new_val: float) -> fl
     return prev_ema * alpha_ + new_val * alpha
 
 
+@njit
+def calc_min(v0: float, v1: float) -> float:
+    return min(v0, v1)
+
+
+@njit
+def calc_max(v0: float, v1: float) -> float:
+    return max(v0, v1)
+
+
 def sort_dict_keys(d):
     if type(d) == list:
         return [sort_dict_keys(e) for e in d]
@@ -415,8 +425,10 @@ class Bot:
         self.n_close_orders = settings['n_close_orders']
         self.entry_qty_pct = settings['entry_qty_pct']
         self.ddown_factor = settings['ddown_factor']
-        self.ema_spread = settings['indicator_settings']['tick_ema']['spread'] \
-            if 'spread' in settings['indicator_settings']['tick_ema'] else 0.0
+        self.ema_long_spread = settings['indicator_settings']['tick_ema']['long_spread'] \
+            if 'long_spread' in settings['indicator_settings']['tick_ema'] else 0.0
+        self.ema_shrt_spread = settings['indicator_settings']['tick_ema']['shrt_spread'] \
+            if 'shrt_spread' in settings['indicator_settings']['tick_ema'] else 0.0
 
         self.min_close_qty_multiplier = settings['min_close_qty_multiplier']
 
@@ -542,7 +554,7 @@ class Bot:
                 (not self.indicator_settings['funding_fee_collect_mode'] or
                  self.position['predicted_funding_rate'] < 0.0):
             bid_price = min(self.ob[0],
-                            round_dn(self.indicators['tick_ema'] * (1 - self.ema_spread),
+                            round_dn(self.indicators['tick_ema_long'] * (1 - self.ema_long_spread),
                                      self.price_step))
         else:
             bid_price = -1.0
@@ -551,7 +563,7 @@ class Bot:
                 (not self.indicator_settings['funding_fee_collect_mode'] or
                  self.position['predicted_funding_rate'] > 0.0):
             ask_price = max(self.ob[1],
-                            round_up(self.indicators['tick_ema'] * (1 + self.ema_spread),
+                            round_up(self.indicators['tick_ema_shrt'] * (1 + self.ema_shrt_spread),
                                      self.price_step))
         else:
             ask_price = -1.0
@@ -770,19 +782,29 @@ class Bot:
 
     def init_tick_ema(self, ticks: [dict]):
         print_(['initiating tick ema...'])
-        ema_span = self.indicator_settings['tick_ema']['span']
-        ema = ticks[0]['price']
-        alpha = 2 / (ema_span + 1)
+        ema_long_span = self.indicator_settings['tick_ema']['long_span']
+        ema_shrt_span = self.indicator_settings['tick_ema']['shrt_span']
+        ema_long = ticks[0]['price']
+        ema_shrt = ticks[0]['price']
+        long_alpha = 2 / (ema_long_span + 1)
+        shrt_alpha = 2 / (ema_shrt_span + 1)
         for t in ticks:
-            ema = ema * (1 - alpha) + t['price'] * alpha
-        self.indicators['tick_ema'] = ema
-        self.indicator_settings['tick_ema']['alpha'] = alpha
-        self.indicator_settings['tick_ema']['alpha_'] = 1 - alpha
+            ema_long = ema_long * (1 - long_alpha) + t['price'] * long_alpha
+            ema_shrt = ema_shrt * (1 - shrt_alpha) + t['price'] * shrt_alpha
+        self.indicators['tick_ema_long'] = long_ema
+        self.indicators['tick_ema_shrt'] = shrt_ema
+        self.indicator_settings['tick_ema']['long_alpha'] = long_alpha
+        self.indicator_settings['tick_ema']['long_alpha_'] = 1 - long_alpha
+        self.indicator_settings['tick_ema']['shrt_alpha'] = shrt_alpha
+        self.indicator_settings['tick_ema']['shrt_alpha_'] = 1 - shrt_alpha
 
     def update_tick_ema(self, websocket_tick):
-        self.indicators['tick_ema'] = \
-            self.indicators['tick_ema'] * self.indicator_settings['tick_ema']['alpha_'] + \
-            websocket_tick['price'] * self.indicator_settings['tick_ema']['alpha']
+        self.indicators['tick_ema_long'] = \
+            self.indicators['tick_ema_long'] * self.indicator_settings['tick_ema']['long_alpha_'] + \
+            websocket_tick['price'] * self.indicator_settings['tick_ema']['long_alpha']
+        self.indicators['tick_ema_shrt'] = \
+            self.indicators['tick_ema_shrt'] * self.indicator_settings['tick_ema']['shrt_alpha_'] + \
+            websocket_tick['price'] * self.indicator_settings['tick_ema']['shrt_alpha']
 
     def init_fancy_indicator_001(self, ticks: [dict]):
         pass
@@ -852,7 +874,8 @@ class Bot:
             self.indicator_settings['ohlcv_rsi']['dnchange_smoothed'] = dnchange_smoothed
 
     async def fetch_ticks(self):
-        n_ticks_to_fetch = int(self.indicator_settings['tick_ema']['span'])
+        n_ticks_to_fetch = int(max(self.indicator_settings['tick_ema']['long_span'],
+                                   self.indicator_settings['tick_ema']['shrt_span']))
         # each fetch contains 1000 ticks
         ticks = await self.fetch_trades()
         additional_ticks = await asyncio.gather(
