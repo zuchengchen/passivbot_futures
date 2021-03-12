@@ -102,7 +102,7 @@ def get_score_func(key: str) -> Callable:
         return candidate_score > best_score
 
     def score_func_avg_adg_min_adg_min_liq_capped(best: dict, candidate: dict) -> bool:
-        cap = 0.25
+        cap = 0.2
         try:
             candidate_score = candidate['average_daily_gain']['avg'] * \
                 candidate['average_daily_gain']['min'] * min(candidate['closest_liq']['min'], cap)
@@ -604,23 +604,18 @@ def backtest(ticks: np.ndarray, settings: dict):
 
 
 def calc_new_val(val, range_, m):
+    # quick fix of bug where random nums weren't random enuf between processes
+    np.random.seed((int(time() * 100000) % (2**31)))
     choice_span = (range_[1] - range_[0]) * m / 2
     biased_mid_point = max(range_[0] + choice_span, min(val, range_[1] - choice_span))
     choice_range = (biased_mid_point - choice_span, biased_mid_point + choice_span)
     new_val = np.random.choice(np.linspace(choice_range[0], choice_range[1], 200))
+    #new_val = np.random.random() * (choice_range[1] - choice_range[0])
     return round_(new_val, range_[2])
 
 
 def get_new_candidate(ranges: dict, best: dict, m=0.2):
-    new_candidate = {}
-    for key in best:
-        if key not in ranges:
-            continue
-        if type(best[key]) == tuple:
-            new_candidate[key] = tuple(sorted([calc_new_val(e, ranges[key], m) for e in best[key]]))
-        else:
-            new_candidate[key] = calc_new_val(best[key], ranges[key], m)
-    return {k_: new_candidate[k_] for k_ in sorted(new_candidate)}
+    return sort_dict_keys({k: calc_new_val(best[k], ranges[k], m) for k in best if k in ranges})
 
 
 def get_downloaded_trades(filepath: str, age_limit_millis: float) -> (pd.DataFrame, dict):
@@ -924,8 +919,9 @@ def dump_shared_data(dirpath: str, result: dict, best_result: dict, lock: Lock) 
         lock.release()
 
 
-def get_next_candidate(backtest_config: dict, candidate: dict, ms: float, k: Value, lock: Lock):
+def get_next_candidate(backtest_config: dict, candidate: dict, ms: [float], k: Value, lock: Lock):
     lock.acquire()
+    new_candidate = candidate.copy()
     try:
         dirpath = backtest_config['session_dirpath']
         keys, best_result = load_keys(dirpath), load_best_result(dirpath)
@@ -933,14 +929,14 @@ def get_next_candidate(backtest_config: dict, candidate: dict, ms: float, k: Val
         for _ in range(10):
             if key not in keys:
                 break
-            candidate = get_new_candidate(backtest_config['ranges'],
-                                          (best_result if best_result else candidate),
-                                          ms[k.value])
-            key = calc_candidate_hash_key(candidate, list(backtest_config['ranges']))
+            new_candidate = get_new_candidate(backtest_config['ranges'],
+                                              (best_result if best_result else candidate),
+                                              m=ms[k.value])
+            key = calc_candidate_hash_key(new_candidate, list(backtest_config['ranges']))
         else:
             return None, key
         append_key(dirpath, key)
-        return candidate, key
+        return new_candidate, key
     finally:
         lock.release()
 
@@ -1001,6 +997,7 @@ async def jackrabbit_multi_core(results: dict,
         workers.append(asyncio.create_task(multiprocess_wrap(
             jackrabbit_worker, (ticks, backtest_config, candidate, score_func, k, ks, ms, lock)
         )))
+        await asyncio.sleep(0.05)
     for w in workers:
         await w
 
@@ -1053,16 +1050,18 @@ def iter_slices(iterable, step: float, size: float):
 
 async def jackrabbit_sliding_window_wrap(ticks: np.ndarray, backtest_config: dict) -> dict:
     sub_runs = []
+    start_ts = time()
     for z, slice_ in enumerate(iter_slices(ticks,
                                            backtest_config['sliding_window_step'],
                                            backtest_config['sliding_window_size'])):
         result_, _ = jackrabbit_wrap(slice_, backtest_config)
         if not result_:
+            print(f"\n{backtest_config['key']} did not finish backtest")
             return {'key': backtest_config['key']}
         sub_runs.append(result_)
+    total_elapsed = time() - start_ts
     result = {}
     skip = ['do_long', 'do_shrt']
-    start_ts = time()
     for k in sub_runs[0]:
         if k in skip:
             continue
@@ -1076,8 +1075,7 @@ async def jackrabbit_sliding_window_wrap(ticks: np.ndarray, backtest_config: dic
                                   **{'full_run': vals[-1]}}}
         except:
             continue
-    total_elapsed = time() - start_ts
-    result['n_sub_runs'] = z + 1
+    result['n_sub_runs'] = z
     result['total_seconds_elapsed'] = total_elapsed
     result['key'] = backtest_config['key']
     return result
