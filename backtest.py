@@ -132,6 +132,14 @@ def get_score_func(key: str) -> Callable:
     raise Exception('unknown score metric', key)
 
 
+def get_break_on_conditions(keys: [str]):
+    def first_stop_loss(trades: [dict], ticks: np.ndarray, k: int):
+        return trades[-1]['type'].startswith('stop_loss')
+
+    def liq_too_close(trades: [dict], ticks: np.ndarray, k: int):
+        return trades[-1]['closest_liq'] < 0.05
+
+
 def plot_tdf(df_, tdf_, side_: int = 0, liq_thr=0.1):
     plt.clf()
     df_.loc[tdf_.index[0]:tdf_.index[-1]].price.plot(style='y-')
@@ -188,9 +196,10 @@ def dump_plots(result: dict, tdf: pd.DataFrame, df: pd.DataFrame):
     lines.append(f"long: {result['do_long']}, short: {result['do_shrt']}")
 
     print('plotting price with bid ask entry thresholds')
-    ema = df.price.ewm(span=result['ema_span'], adjust=False).mean()
-    bids_ = ema * (1 - result['ema_spread'])
-    asks_ = ema * (1 + result['ema_spread'])
+    ema_long = df.price.ewm(span=result['ema_long_span'], adjust=False).mean()
+    ema_shrt = df.price.ewm(span=result['ema_shrt_span'], adjust=False).mean()
+    bids_ = ema_long * (1 - result['ema_long_spread'])
+    asks_ = ema_shrt * (1 + result['ema_shrt_spread'])
     
     plt.clf()
     df.price.iloc[::100].plot()
@@ -272,6 +281,7 @@ def backtest(ticks: np.ndarray, settings: dict):
 
     pos_size, pos_price, reentry_price, reentry_qty, liq_price = 0.0, 0.0, 0.0, 0.0, 0.0
     closest_long_liq, closest_shrt_liq = 1.0, 1.0
+    highest_pos_price_diff = 0.0
     stop_loss_liq_diff_price, stop_loss_pos_price_diff_price, stop_loss_price = 0.0, 0.0, 0.0
     actual_balance = ss['starting_balance']
     apparent_balance = actual_balance * ss['balance_pct']
@@ -304,10 +314,14 @@ def backtest(ticks: np.ndarray, settings: dict):
             binance_calc_cross_shrt_liq_price(bal, psize, pprice, ss['leverage'])
 
     break_on = {e[0]: eval(e[1]) for e in settings['break_on'] if e[0].startswith('ON:')}
+    break_on_ts = np.nan
 
-    ema = ticks[0][0]
-    ema_alpha = 2 / (ss['ema_span'] + 1)
-    ema_alpha_ = 1 - ema_alpha
+    ema_long = ticks[0][0]
+    ema_shrt = ticks[0][0]
+    ema_long_alpha = 2 / (ss['ema_long_span'] + 1)
+    ema_long_alpha_ = 1 - ema_long_alpha
+    ema_shrt_alpha = 2 / (ss['ema_shrt_span'] + 1)
+    ema_shrt_alpha_ = 1 - ema_shrt_alpha
     prev_trade_ts = 0
     min_trade_delay_millis = ss['latency_simulation_ms'] if 'latency_simulation_ms' in ss else 1000
 
@@ -321,8 +335,8 @@ def backtest(ticks: np.ndarray, settings: dict):
             if pos_size == 0.0:
                 # create long pos
                 if ss['do_long']:
-                    price = calc_no_pos_bid_price(ss['price_step'], ss['ema_spread'], ema, ob[0])
-                    if t[0] < price and ss['do_long']:
+                    price = calc_no_pos_bid_price(ss['price_step'], ss['ema_long_spread'], ema_long, ob[0])
+                    if t[0] < price:
                         did_trade = True
                         qty = min_entry_qty_f(ss['qty_step'], ss['min_qty'], ss['min_cost'],
                                               ss['entry_qty_pct'], ss['leverage'], apparent_balance,
@@ -331,7 +345,7 @@ def backtest(ticks: np.ndarray, settings: dict):
                         pnl = 0.0
                         fee_paid = -cost_f(qty, price) * ss['maker_fee']
             elif pos_size > 0.0:
-                closest_long_liq = min(calc_diff(liq_price, t[0]), closest_long_liq)
+                closest_long_liq = calc_min(calc_diff(liq_price, t[0]), closest_long_liq)
                 if t[0] <= liq_price and closest_long_liq < 0.2:
                     # long liquidation
                     print('\nlong liquidation')
@@ -352,6 +366,7 @@ def backtest(ticks: np.ndarray, settings: dict):
                 else:
                     stop_loss_price = 0.0
             else:
+                highest_pos_price_diff = calc_max(calc_diff(pos_price, t[0]), highest_pos_price_diff)
                 if t[0] <= pos_price:
                     # close shrt pos
                     min_close_qty = calc_min_close_qty(
@@ -390,7 +405,7 @@ def backtest(ticks: np.ndarray, settings: dict):
             if pos_size == 0.0:
                 # create shrt pos
                 if ss['do_shrt']:
-                    price = calc_no_pos_ask_price(ss['price_step'], ss['ema_spread'], ema, ob[1])
+                    price = calc_no_pos_ask_price(ss['price_step'], ss['ema_shrt_spread'], ema_shrt, ob[1])
                     if t[0] > price:
                         did_trade = True
                         qty = -min_entry_qty_f(ss['qty_step'], ss['min_qty'], ss['min_cost'],
@@ -421,6 +436,7 @@ def backtest(ticks: np.ndarray, settings: dict):
                 else:
                     stop_loss_price = 0.0
             else:
+                highest_pos_price_diff = calc_max(calc_diff(pos_price, t[0]), highest_pos_price_diff)
                 # close long pos
                 if t[0] >= pos_price:
                     min_close_qty = calc_min_close_qty(
@@ -453,7 +469,8 @@ def backtest(ticks: np.ndarray, settings: dict):
                     pnl = long_pnl_f(pos_price, price, qty)
                     fee_paid = -cost_f(-qty, price) * ss['maker_fee']
             ob[1] = t[0]
-        ema = calc_ema(ema_alpha, ema_alpha_, ema, t[0])
+        ema_long = calc_ema(ema_long_alpha, ema_long_alpha_, ema_long, t[0])
+        ema_shrt = calc_ema(ema_shrt_alpha, ema_shrt_alpha_, ema_shrt, t[0])
         if did_trade:
             if t[2] - prev_trade_ts < min_trade_delay_millis:
                 if trade_type == 'reentry':
@@ -516,10 +533,11 @@ def backtest(ticks: np.ndarray, settings: dict):
                            'closest_long_liq': closest_long_liq,
                            'closest_shrt_liq': closest_shrt_liq,
                            'closest_liq': min(closest_long_liq, closest_shrt_liq),
+                           'highest_pos_price_diff': highest_pos_price_diff,
                            'avg_gain_per_tick': avg_gain_per_tick,
                            'millis_since_prev_trade': millis_since_prev_trade,
                            'progress': progress})
-            closest_long_liq, closest_shrt_liq = 1.0, 1.0
+            closest_long_liq, closest_shrt_liq, highest_pos_price_diff = 1.0, 1.0, 0.0
             for key, condition in break_on.items():
                 if condition(trades, ticks, k):
                     print('break on', key)
@@ -758,8 +776,10 @@ async def fetch_market_specific_settings(exchange: str, user: str, symbol: str):
 def live_settings_to_candidate(live_settings: dict, ranges: dict) -> dict:
     candidate = {k: live_settings[k] for k in ranges if k in live_settings}
     for k in ['span', 'spread']:
-        if k in live_settings['indicator_settings']['tick_ema']:
-            candidate['ema_' + k] = live_settings['indicator_settings']['tick_ema'][k]
+        if 'long_' + k in live_settings['indicator_settings']['tick_ema']:
+            candidate['ema_long_' + k] = live_settings['indicator_settings']['tick_ema']['long_' + k]
+        if 'shrt_' + k in live_settings['indicator_settings']['tick_ema']:
+            candidate['ema_shrt_' + k] = live_settings['indicator_settings']['tick_ema']['shrt_' + k]
     for k in ['do_long', 'do_shrt']:
         candidate[k] = live_settings['indicator_settings'][k]
     return candidate
@@ -774,7 +794,8 @@ def candidate_to_live_settings(exchange: str, candidate: dict) -> dict:
         if k in live_settings:
             live_settings[k] = candidate[k]
     for k in ['ema_span', 'ema_spread']:
-        live_settings['indicator_settings']['tick_ema'][k[4:]] = candidate[k]
+        live_settings['indicator_settings']['tick_ema']['long_' + k[4:]] = candidate[k.replace('_', '_long_')]
+        live_settings['indicator_settings']['tick_ema']['shrt_' + k[4:]] = candidate[k.replace('_', '_shrt_')]
     for k in ['do_long', 'do_shrt']:
         live_settings['indicator_settings'][k] = bool(candidate[k])
     return live_settings
@@ -871,18 +892,24 @@ def load_best_result(dirpath: str):
     return {}
 
 
+def load_keys(dirpath: str) -> set:
+    if os.path.exists((p := dirpath + 'keys.txt')):
+        with open(p) as f:
+            keys = set([line.strip() for line in f.readlines()])
+    else:
+        keys = set()
+    return keys
+
+def append_key(dirpath: str, key: str):
+    with open(dirpath + 'keys.txt', 'a') as f:
+        f.write(key + '\n')
+
 def load_shared_data(dirpath: str, lock: Lock) -> (dict, dict):
     lock.acquire()
     try:
-        if os.path.exists((p := dirpath + 'keys.txt')):
-            with open(p) as f:
-                keys = set([line.strip() for line in f.readlines()])
-        else:
-            keys = set()
-        best_result = load_best_result(dirpath)
+        return load_keys(dirpath), load_best_result(dirpath)
     finally:
         lock.release()
-    return keys, best_result
 
 
 def dump_shared_data(dirpath: str, result: dict, best_result: dict, lock: Lock) -> None:
@@ -890,10 +917,30 @@ def dump_shared_data(dirpath: str, result: dict, best_result: dict, lock: Lock) 
     try:
         with open(dirpath + 'results.txt', 'a') as f:
             f.write(json.dumps(result) + '\n')
-        with open(dirpath + 'keys.txt', 'a') as f:
-            f.write(result['key'] + '\n')
+        append_key(dirpath, result['key'])
         if load_best_result(dirpath) != best_result:
             json.dump(best_result, open(dirpath + 'best_result.json', 'w'), indent=4)
+    finally:
+        lock.release()
+
+
+def get_next_candidate(backtest_config: dict, candidate: dict, ms: float, k: Value, lock: Lock):
+    lock.acquire()
+    try:
+        dirpath = backtest_config['session_dirpath']
+        keys, best_result = load_keys(dirpath), load_best_result(dirpath)
+        key = calc_candidate_hash_key(candidate, list(backtest_config['ranges']))
+        for _ in range(10):
+            if key not in keys:
+                break
+            candidate = get_new_candidate(backtest_config['ranges'],
+                                          (best_result if best_result else candidate),
+                                          ms[k.value])
+            key = calc_candidate_hash_key(candidate, list(backtest_config['ranges']))
+        else:
+            return None, key
+        append_key(dirpath, key)
+        return candidate, key
     finally:
         lock.release()
 
@@ -906,24 +953,19 @@ async def jackrabbit_worker(ticks: np.ndarray,
                             ks: int,
                             ms: [float],
                             lock: Lock):
-    keys, best_result = load_shared_data(backtest_config['session_dirpath'], lock)
     start_time = time()
     while True:
-        k.value = k.value + 1
         if k.value >= ks:
             break
-        key = calc_candidate_hash_key(candidate, list(backtest_config['ranges']))
-        for _ in range(10):
-            if key not in keys:
-                break
-            candidate = get_new_candidate(backtest_config['ranges'],
-                                          (best_result if best_result else candidate),
-                                          ms[k.value])
-            key = calc_candidate_hash_key(candidate, list(backtest_config['ranges']))
-        else:
+        candidate, key = get_next_candidate(backtest_config, candidate, ms, k, lock)
+        if candidate is None:
             break
+        k.value = k.value + 1
         bpm = k.value / (time() - start_time) * 60
-        print(f'running backtest {k.value} of {ks}.  backtests per minute: {bpm:.2f}')
+        line = f'running backtest {k.value} of {ks}. m={ms[k.value]:.3f} {key} '
+        line += f'backtests per minute: {bpm:.2f}'
+        print(line)
+        print(candidate, '\n')
         result = await jackrabbit_sliding_window_wrap(ticks, {**backtest_config,
                                                               **candidate,
                                                               **{'key': key}})
@@ -955,7 +997,7 @@ async def jackrabbit_multi_core(results: dict,
     lock = Lock()
     k = Value('i', k_)
     workers = []
-    for _ in range(n_cpus):
+    for _ in range(min(n_cpus, ks)):
         workers.append(asyncio.create_task(multiprocess_wrap(
             jackrabbit_worker, (ticks, backtest_config, candidate, score_func, k, ks, ms, lock)
         )))
@@ -1011,9 +1053,9 @@ def iter_slices(iterable, step: float, size: float):
 
 async def jackrabbit_sliding_window_wrap(ticks: np.ndarray, backtest_config: dict) -> dict:
     sub_runs = []
-    for slice_ in iter_slices(ticks,
-                              backtest_config['sliding_window_step'],
-                              backtest_config['sliding_window_size']):
+    for z, slice_ in enumerate(iter_slices(ticks,
+                                           backtest_config['sliding_window_step'],
+                                           backtest_config['sliding_window_size'])):
         result_, _ = jackrabbit_wrap(slice_, backtest_config)
         if not result_:
             return {'key': backtest_config['key']}
@@ -1029,17 +1071,20 @@ async def jackrabbit_sliding_window_wrap(ticks: np.ndarray, backtest_config: dic
             result[k] = {'avg': np.mean(vals),
                          'std': np.std(vals),
                          'min': min(vals),
-                         'max': max(vals)}
+                         'max': max(vals),
+                         'vals': {**{f'sub_run_{i:03}': v for i, v in enumerate(vals[:-1])},
+                                  **{'full_run': vals[-1]}}}
         except:
             continue
     total_elapsed = time() - start_ts
+    result['n_sub_runs'] = z + 1
     result['total_seconds_elapsed'] = total_elapsed
     result['key'] = backtest_config['key']
     return result
 
 
 async def load_ticks(backtest_config: dict) -> [dict]:
-    ticks_filepath = os.path.join(backtest_config['session_dirpath'], f"ticks_cache.npy")
+    ticks_filepath = make_get_filepath(os.path.join(backtest_config['session_dirpath'], f"ticks_cache.npy"))
     if os.path.exists(ticks_filepath):
         print('loading cached trade list', ticks_filepath)
         ticks = np.load(ticks_filepath, allow_pickle=True)
@@ -1074,7 +1119,7 @@ async def prep_backtest_config(config_name: str):
     backtest_config.update(market_specific_settings)
 
     # setting absolute min/max ranges
-    for key in ['balance_pct', 'entry_qty_pct', 'ddown_factor', 'ema_span', 'ema_spread',
+    for key in ['balance_pct', 'entry_qty_pct', 'ddown_factor', 'ema_long_span', 'ema_shrt_span',
                 'grid_coefficient', 'grid_spacing', 'min_close_qty_multiplier',
                 'stop_loss_pos_reduction']:
         backtest_config['ranges'][key][0] = max(0.0, backtest_config['ranges'][key][0])
