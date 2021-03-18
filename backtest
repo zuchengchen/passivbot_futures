@@ -1,0 +1,2 @@
+#!/bin/bash 
+while true; do python backtest_pso.py $1; done
