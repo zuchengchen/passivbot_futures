@@ -53,5 +53,5 @@
     do_shrt: [0, 0, 1]
   }
   n_particles: 500
-  iters: 1000
+  iters: 10
 }
