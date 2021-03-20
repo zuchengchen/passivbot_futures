@@ -445,7 +445,7 @@ async def load_trades(exchange: str, user: str, symbol: str, n_days: float) -> p
         print(exchange, 'not found')
         return
     cc = init_ccxt(exchange, user)
-    filepath = make_get_filepath(os.path.join('historical_data', exchange, 'agg_trades_futures',
+    filepath = make_get_filepath(os.path.join(base_path, 'historical_data', exchange, 'agg_trades_futures',
                                               symbol, ''))
     cache_filepath = make_get_filepath(filepath.replace(symbol, symbol + '_cache'))
     age_limit = time() - 60 * 60 * 24 * n_days
@@ -771,10 +771,11 @@ async def prep_backtest_config(config_name: str):
     session_name = backtest_config['session_name']
 
     session_dirpath = make_get_filepath(os.path.join(
+        base_path,
         'backtest_results',
         exchange,
         symbol,
-        f"{session_name}_{backtest_config['n_days']}_days",
+        f"{session_name}_{backtest_config['n_days']}days",
         ''))
     if os.path.exists((mss := session_dirpath + 'market_specific_settings.json')):
         market_specific_settings = json.load(open(mss))
@@ -809,7 +810,7 @@ fitting_params = ['balance_pct', 'entry_qty_pct', 'ddown_factor', 'ema_span', 'e
                   'stop_loss_pos_price_diff', 'max_markup', 'min_markup', 'min_close_qty_multiplier', 
                   'n_close_orders', 'stop_loss_pos_reduction']
 
-def backtest_pso0(x, ss):
+def backtest_pso0(x, ss, ticks):
 
     # ticks formatting [price: float, buyer_maker: bool, timestamp: float]
     x3 = int(x[3])
@@ -1161,14 +1162,14 @@ async def backtest_pso(config_name, n_particles=10, iters=100, n_processes=None)
     )
     
     ss = {**settings, **candidate}
-    global ticks
+#     global ticks
     ticks = await load_ticks(settings)
     lower_bound = np.array([settings["ranges"][para][0] for para in fitting_params])
     upper_bound = np.array([settings["ranges"][para][1] for para in fitting_params])
     bounds = (lower_bound, upper_bound)
     
     def backtest_pso1(x):
-        return backtest_pso0(x, ss)
+        return backtest_pso0(x, ss, ticks)
     
     global f
     def f(x):
@@ -1202,21 +1203,23 @@ def array_to_live_settings_file(exchange: str, candidate, config) -> dict:
     json.dump(live_settings, open(live_result_path, 'w'), indent=4)
 
 def array_to_dict(x, fitting_params):
-    for i in [3, 7, 13]:
-        x[i] = int(x[i])
     ss = dict()
     for i in range(len(fitting_params)): 
-        ss[fitting_params[i]] = x[i]
+        if fitting_params[i] in ['ema_span', 'leverage', 'n_close_orders']:
+            ss[fitting_params[i]] = int(x[i])
+        else:            
+            ss[fitting_params[i]] = x[i]
+    print(ss)
     return ss
 
 def get_live_result_path(ss):
-    path = f"backtest_results/{ss['exchange']}/{ss['symbol']}/{ss['session_name']}_{ss['n_days']}_days/live_config.json"
+    path = f"{base_path}/backtest_results/{ss['exchange']}/{ss['symbol']}/{ss['session_name']}_{ss['n_days']}days/live_config.json"
     return path
 
 async def main():
     config_name = sys.argv[1]
     ss = await prep_backtest_config(config_name)
-    ticks = await load_ticks(ss)
+#     ticks = await load_ticks(ss)
     stats = await backtest_pso(config_name, n_particles=ss["n_particles"], iters=ss["iters"])
     candidate = array_to_dict(stats[1], fitting_params)
     array_to_live_settings_file(ss["exchange"], candidate, ss)

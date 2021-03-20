@@ -437,7 +437,7 @@ class Bot:
 
         self.my_trades = []
         self.my_trades_cache_filepath = \
-            make_get_filepath(os.path.join('historical_data', self.exchange, 'my_trades',
+            make_get_filepath(os.path.join(base_path, 'historical_data', self.exchange, 'my_trades',
                                            self.symbol, 'my_trades.txt'))
 
         self.log_level = 0
