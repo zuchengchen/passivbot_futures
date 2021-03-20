@@ -9,7 +9,8 @@ import asyncio
 import sys
 from time import time, sleep
 from typing import Iterator
-
+base_path = os.path.expanduser('~/projects/working/stock/passivbot_futures')
+sys.path.insert(0, base_path)
 
 try:
     print('using numba')
@@ -164,7 +165,8 @@ def calc_no_pos_ask_price(price_step: float,
 def calc_pos_reduction_qty(qty_step: float,
                            stop_loss_pos_reduction: float,
                            pos_size: float) -> float:
-    return min((aps := abs(pos_size)), round_up(aps * stop_loss_pos_reduction, qty_step))
+    aps = abs(pos_size)
+    return min(aps, round_up(aps * stop_loss_pos_reduction, qty_step))
 
 
 @njit
@@ -312,7 +314,7 @@ def make_get_filepath(filepath: str) -> str:
 
 def load_key_secret(exchange: str, user: str) -> (str, str):
     try:
-        return json.load(open(f'api_key_secrets/{exchange}/{user}.json'))
+        return json.load(open(f'{base_path}/api_key_secrets/{exchange}/{user}.json'))
     except(FileNotFoundError):
         print(f'\n\nPlease specify {exchange} API key/secret in file\n\napi_key_secre' + \
               f'ts/{exchange}/{user}.json\n\nformatted thus:\n["Ktnks95U...", "yDKRQqA6..."]\n\n')
@@ -347,7 +349,7 @@ def print_(args, r=False, n=False):
 
 
 def load_live_settings(exchange: str, user: str = 'default', do_print=True) -> dict:
-    fpath = f'live_settings/{exchange}/'
+    fpath = f'{base_path}/live_settings/{exchange}/'
     try:
         settings = json.load(open(f'{fpath}{user}.json'))
     except FileNotFoundError:
