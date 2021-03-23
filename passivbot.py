@@ -9,8 +9,7 @@ import asyncio
 import sys
 from time import time, sleep
 from typing import Iterator
-base_path = os.path.expanduser('~/projects/working/stock/passivbot_futures')
-sys.path.insert(0, base_path)
+base_path = os.path.dirname(os.path.abspath(__file__))
 
 try:
     print('using numba')

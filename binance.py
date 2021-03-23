@@ -45,9 +45,9 @@ def get_max_pos_size_ito_usdt(symbol: str, leverage: int) -> float:
                     'RSRUSDT', 'RUNEUSDT', 'SNXUSDT', 'SOLUSDT', 'SRMUSDT', 'STORJUSDT',
                     'SUSHIUSDT', 'SXPUSDT', 'THETAUSDT', 'TOMOUSDT', 'TRBUSDT', 'UNIUSDT',
                     'VETUSDT', 'WAVESUSDT', 'YFIIUSDT', 'YFIUSDT', 'ZECUSDT', 'ZILUSDT', 'ZRXUSDT',
-                    'ZENUSDT', 'SKLUSDT', 'GRTUSDT', '1INCHUSDT']:
+                    'ZENUSDT', 'SKLUSDT', 'GRTUSDT', '1INCHUSDT', 'REEFUSDT', 'LITUSDT', 'LUNAUSDT']:
         kvs = [(20, 5000), (10, 25000), (5, 100000), (2, 250000), (1, 1000000)]
-    elif symbol in ['CTKUSDT', 'LITUSDT']:
+    elif symbol in ['CTKUSDT']:
         kvs = [(10, 5000), (5, 25000), (4, 100000), (2, 250000), (1, 1000000)]
     else:
         print(f'{symbol} unknown symbol')

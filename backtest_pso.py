@@ -20,9 +20,6 @@ from binance import calc_cross_long_liq_price as binance_calc_cross_long_liq_pri
 from binance import calc_cross_shrt_liq_price as binance_calc_cross_shrt_liq_price
 import pyswarms as ps
 from typing import Iterator
-base_path = os.path.expanduser('~/projects/working/stock/passivbot_futures')
-sys.path.insert(0, base_path)
-
 
 def prep_ticks(df: pd.DataFrame) -> np.ndarray:
     dfc = df[df.price != df.price.shift(1)] # drop consecutive same price trades
