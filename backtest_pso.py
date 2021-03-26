@@ -1187,7 +1187,7 @@ async def backtest_pso(config_name, n_particles=10, iters=100, n_processes=None)
 
 
 def array_to_live_settings_file(exchange: str, candidate, config) -> dict:
-    live_settings = load_live_settings(exchange, do_print=False)
+    live_settings = load_live_settings(exchange, do_print=True)
     live_settings['config_name'] = config['session_name']
     live_settings['symbol'] = config['symbol']
     for k in candidate:
