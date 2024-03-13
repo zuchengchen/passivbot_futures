@@ -157,7 +157,7 @@ class Bot:
             ("cross_wallet_pct", 1.0),
             ("price_distance_threshold", 0.5),
             ("c_mult", 1.0),
-            ("leverage", 7.0),
+            ("leverage", 20.0),
             ("countdown", False),
             ("countdown_offset", 0),
             ("ohlcv", True),
@@ -1755,7 +1755,7 @@ async def main() -> None:
         type=int,
         required=False,
         dest="leverage",
-        default=7,
+        default=20,
         help="Leverage set on exchange, if applicable.  Default is 7.",
     )
     parser.add_argument(

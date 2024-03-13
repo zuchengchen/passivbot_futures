@@ -4,7 +4,7 @@
   */
 
   // exchange from api-keys.json is used
-  user: binance_01
+  user: binance_04
 
   // how much below past peak balance to allow losses (default 1% == 0.01). Set to 0.0 to disable auto unstuck.
   loss_allowance_pct: 0.01

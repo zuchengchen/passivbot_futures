@@ -1,6 +1,6 @@
 {
   # exchange from api-keys.json is used
-  user: binance_01
+  user: binance_04
 
   # format YYYY-MM-DD
   start_date: 2021-05-01

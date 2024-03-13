@@ -1,0 +1,12 @@
+#!/bin/sh
+coins=`cat future_coins.txt`
+coinslist=($coins)
+length=${#coinslist[@]}
+#for coin in $coins; do python backtest.py -b configs/backtest/${coin}.hjson configs/live/$1.json ; done
+
+for (( i = 0; i < length; i++ ));
+do
+    python backtest.py -b configs/backtest/${coinslist[i]}.hjson configs/live/$1.json -p False
+done
+
+
