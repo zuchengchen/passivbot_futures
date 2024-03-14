@@ -53,8 +53,8 @@ instances:
     long_mode: "gs"
     symbols:
     #  - "ALGOUSDT"
-     - "ARBUSDT"
-     - "STMXUSDT"
+    #  - "ARBUSDT"
+    #  - "STMXUSDT"
     #  - "ARPAUSDT"
     #  - "CELOUSDT"
      - "CHRUSDT"
@@ -65,9 +65,9 @@ instances:
     #  - "MOVRUSDT"
      - "SPELLUSDT"  
     #  - "SSVUSDT" 
-     - "XVGUSDT"
+    #  - "XVGUSDT"
 
-    #  - "1000SATSUSDT"
+     - "1000SATSUSDT"
     #  - "NEARUSDT"
     #  - "OGNUSDT"
     #  - "DARUSDT"
