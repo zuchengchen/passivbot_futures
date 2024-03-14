@@ -35,7 +35,7 @@
 
   # format YYYY-MM-DD
   # end_date may be set to "now" or "today" to use current day (UTC) as end_date
-  start_date: 2019-01-01
+  start_date: 2024-01-01
   #  2024-02-01
   end_date: now
 
