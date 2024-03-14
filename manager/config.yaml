@@ -3,7 +3,7 @@ defaults:
   config: "latest.json"
 instances:
   - user: "binance_04"
-    long_mode: "gs"
+    long_mode: "n"
     symbols:
      - "1000PEPEUSDT"
      - "AEVOUSDT"
@@ -30,9 +30,6 @@ instances:
      - "JUPUSDT"
      - "LRCUSDT"
      - "JTOUSDT"
-
-
-
 
     
     #  - "INJUSDT"
