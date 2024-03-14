@@ -54,7 +54,7 @@ instances:
      - "CELOUSDT"
      - "IOTXUSDT"
      - "NEARUSDT"
-    #  - "OGNUSDT"
+     - "OGNUSDT"
      - "SPELLUSDT"   
      - "DARUSDT"
      - "JOEUSDT"
