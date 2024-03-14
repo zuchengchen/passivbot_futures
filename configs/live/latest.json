@@ -9,7 +9,7 @@
           "ema_span_0": 100,
           "ema_span_1": 200,
           "enabled": true,
-          "initial_eprice_ema_dist": 0.005,
+          "initial_eprice_ema_dist": -0.001,
           "initial_qty_pct": 0.005,
           "markup_range": 0.003,
           "min_markup": 0.003,
