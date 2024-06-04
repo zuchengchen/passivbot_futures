@@ -33,7 +33,7 @@ def get_price_diffs(exchange):
     #     print(red(f"开始从{exchange}交易所搜寻{len(valid_coin_pairs)}个交易对."))
 
     for coin_pair in valid_coin_pairs:
-        df = get_historical_data(exchange, coin_pair, limit=60)
+        df = get_historical_data(exchange, coin_pair, timeframe="5m", limit=1000)
         #         print(coin_pair)
         price_diffs.append(df.price_diff.mean())
         valid_coin_pairs_noUSDT.append(get_coin(coin_pair))
@@ -46,7 +46,7 @@ def get_price_diffs(exchange):
     )
     df.set_index("币对", inplace=True)
     result0 = df.sort_values(by=["价差"], ascending=False)[:20]
-    result = result0.index.tolist() #.sort()
+    result = result0.index.tolist()  # .sort()
     return result
 
 
@@ -85,6 +85,7 @@ def get_valid_coin_pairs(exchange):
 binance = ccxt.binance({"options": {"defaultType": "future"}})
 exchange = binance
 
+
 def send_message(exchange):
     print(current_time())
     buy_message = f"{current_time()} \n"
@@ -98,12 +99,12 @@ def send_message(exchange):
         # Write content to the file
         file.write("version: 2\n")
         file.write("defaults:\n")
-        file.write("  config: \"latest.json\"\n")
+        file.write('  config: "latest.json"\n')
         file.write("instances:\n")
-        file.write("  - user: \"binance_04\"\n")
+        file.write('  - user: "binance_04"\n')
         file.write("    symbols:\n")
         for symbol in symbols:
-            file.write(f"     - \"{symbol}USDT\"\n")
+            file.write(f'     - "{symbol}USDT"\n')
 
 
 time_interval = 5 * 60  # 间隔 7*24*3600
