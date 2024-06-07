@@ -5,13 +5,16 @@ instances:
   - user: "binance_04"
     long_mode: "n"
     symbols:
+     - "REEFUSDT"
+     - "RUNEUSDT"
+     - "PEOPLEUSDT"
 
   - user: "binance_04"
     long_mode: "gs"
     symbols:
+     - "DARUSDT"
      - "LQTYUSDT"
      - "BELUSDT"
-     - "PEOPLEUSDT"
      - "BAKEUSDT"
      - "ATAUSDT"
      - "IOTXUSDT"
