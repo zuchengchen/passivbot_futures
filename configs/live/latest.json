@@ -14,7 +14,7 @@
           "markup_range": 0.003,
           "min_markup": 0.003,
           "n_close_orders": 1,
-          "rentry_pprice_dist": 0.01,
+          "rentry_pprice_dist": 0.005,
           "rentry_pprice_dist_wallet_exposure_weighting": 1.5,
           "wallet_exposure_limit": 0.9},
  "short": {"auto_unstuck_delay_minutes": 0.0,

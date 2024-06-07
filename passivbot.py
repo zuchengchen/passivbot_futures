@@ -217,12 +217,12 @@ class Bot:
             self.xk["auto_unstuck_delay_minutes"] = (0.0, 0.0)
             self.xk["auto_unstuck_qty_pct"] = (0.0, 0.0)
             self.xk["delay_between_fills_ms_entry"] = (
-                self.config["long"]["delay_between_fills_minutes_entry"] * 60 * 1000.0,
-                self.config["short"]["delay_between_fills_minutes_entry"] * 60 * 1000.0,
+                self.config["long"]["delay_between_fills_minutes_entry"] * 1 * 1000.0,
+                self.config["short"]["delay_between_fills_minutes_entry"] * 1 * 1000.0,
             )
             self.xk["delay_between_fills_ms_close"] = (
-                self.config["long"]["delay_between_fills_minutes_close"] * 60 * 1000.0,
-                self.config["short"]["delay_between_fills_minutes_close"] * 60 * 1000.0,
+                self.config["long"]["delay_between_fills_minutes_close"] * 1 * 1000.0,
+                self.config["short"]["delay_between_fills_minutes_close"] * 1 * 1000.0,
             )
         print("initiating position, open orders, fills, exchange config, order book, and emas...")
         await asyncio.sleep(self.countdown_offset)
