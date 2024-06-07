@@ -5,6 +5,12 @@ instances:
   - user: "binance_04"
     long_mode: "n"
     symbols:
+
+  - user: "binance_04"
+    long_mode: "gs"
+    symbols:
+     - "LQTYUSDT"
+     - "BELUSDT"
      - "PEOPLEUSDT"
      - "BAKEUSDT"
      - "ATAUSDT"
@@ -25,9 +31,3 @@ instances:
      - "C98USDT"
      - "QTUMUSDT"
      - "GMTUSDT"
-
-  - user: "binance_04"
-    long_mode: "gs"
-    symbols:
-     - "LQTYUSDT"
-     - "BELUSDT"
