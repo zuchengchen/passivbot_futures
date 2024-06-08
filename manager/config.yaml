@@ -5,6 +5,11 @@ instances:
   - user: "binance_04"
     long_mode: "n"
     symbols:
+
+  - user: "binance_04"
+    long_mode: "gs"
+    symbols:
+     - "DENTUSDT"
      - "REEFUSDT"
      - "RUNEUSDT"
      - "PEOPLEUSDT"
@@ -26,8 +31,3 @@ instances:
      - "GMTUSDT"
      - "DARUSDT"
      - "RSRUSDT"
-
-  - user: "binance_04"
-    long_mode: "gs"
-    symbols:
-     - "DENTUSDT"
